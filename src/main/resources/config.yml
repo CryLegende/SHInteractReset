@@ -1,0 +1,11 @@
+# Délai en secondes avant que le bloc ne revienne à son état initial.
+delay-seconds: 3
+
+# Liste des mondes où le plugin sera actif.
+# Mettez les noms exacts des mondes.
+whitelisted-worlds:
+  - "spawn"
+  - "arene"
+
+# Activer les messages de debug dans la console
+debug-mode: false

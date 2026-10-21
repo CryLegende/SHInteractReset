@@ -1,0 +1,20 @@
+name: SHInteractReset
+version: '${project.version}'
+main: org.Cry_Legende.sHInteractReset.SHInteractReset
+api-version: '1.20'
+author: Cry_Legende
+description: Réinitialise l'état des blocs interactifs (portes, trappes) après un délai dans des mondes spécifiques.
+
+commands:
+  shinteractresetreload:
+    description: Recharge la configuration du plugin SHInteractReset.
+    usage: /shinteractresetreload
+    permission: shinteractreset.reload
+
+permissions:
+  shinteractreset.reload:
+    description: Permet de recharger la configuration du plugin.
+    default: op
+  shinteractreset.bypass:
+    description: Permet au joueur d'ignorer la réinitialisation automatique des blocs.
+    default: op
