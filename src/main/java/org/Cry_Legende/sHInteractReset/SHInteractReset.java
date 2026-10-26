@@ -3,6 +3,7 @@ package org.Cry_Legende.sHInteractReset;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Registry;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.block.Block;
@@ -87,14 +88,32 @@ public class SHInteractReset extends JavaPlugin implements Listener, CommandExec
         }
     }
 
-    @Override
-    public void onDisable() {
-        for (PendingResetTask taskInfo : pendingTasks.values()) {
+    /**
+     * Annule les resets en attente et remet tout de suite les blocs dans leur état d'origine :
+     * sinon une porte ouverte juste avant un arrêt ou un rechargement resterait ouverte.
+     */
+    private void flushPendingResets() {
+        for (Map.Entry<Location, PendingResetTask> entry : pendingTasks.entrySet()) {
+            PendingResetTask taskInfo = entry.getValue();
             if (taskInfo.getTask() != null && !taskInfo.getTask().isCancelled()) {
                 taskInfo.getTask().cancel();
             }
+            Location loc = entry.getKey();
+            if (loc.getWorld() == null) {
+                continue;
+            }
+            Block block = loc.getBlock();
+            BlockData target = taskInfo.getInitialState();
+            if (block.getType() == target.getMaterial() && !block.getBlockData().matches(target)) {
+                block.setBlockData(target, true);
+            }
         }
         pendingTasks.clear();
+    }
+
+    @Override
+    public void onDisable() {
+        flushPendingResets();
         getLogger().info("SHInteractReset a été désactivé et les tâches en attente annulées.");
     }
 
@@ -120,12 +139,7 @@ public class SHInteractReset extends JavaPlugin implements Listener, CommandExec
                 sender.sendMessage("§cVous n'avez pas la permission d'exécuter cette commande.");
                 return true;
             }
-            for (PendingResetTask taskInfo : pendingTasks.values()) {
-                if (taskInfo.getTask() != null && !taskInfo.getTask().isCancelled()) {
-                    taskInfo.getTask().cancel();
-                }
-            }
-            pendingTasks.clear();
+            flushPendingResets();
 
             reloadConfig();
             loadConfigValues(); // Recharge toutes les valeurs
@@ -171,6 +185,13 @@ public class SHInteractReset extends JavaPlugin implements Listener, CommandExec
                 getLogger().log(Level.INFO, "Joueur " + player.getName() + " a la permission bypass. Interaction ignorée pour SHInteractReset sur " + clickedBlock.getType() + " à " + blockLocation);
             }
             return; // Le joueur bypass le reset, et donc aussi la logique de double porte liée au reset.
+        }
+
+        // Accroupi avec un objet en main : le serveur ne touche pas au bloc (il poserait un bloc contre lui),
+        // il ne faut donc ni synchroniser le partenaire ni planifier de reset
+        if (player.isSneaking() && (!player.getInventory().getItemInMainHand().isEmpty()
+            || !player.getInventory().getItemInOffHand().isEmpty())) {
+            return;
         }
 
         // L'état du bloc AVANT que l'interaction du joueur ne soit effectivement appliquée par le serveur.
@@ -244,6 +265,11 @@ public class SHInteractReset extends JavaPlugin implements Listener, CommandExec
         }
 
         BukkitTask newTask = Bukkit.getScheduler().runTaskLater(this, () -> {
+            // Monde déchargé entre-temps : rien à remettre
+            if (blockLocation.getWorld() == null) {
+                pendingTasks.remove(blockLocation);
+                return;
+            }
             Block blockInFuture = blockLocation.getBlock();
 
             if (blockInFuture.getType() == targetRevertState.getMaterial()) {
@@ -383,7 +409,7 @@ public class SHInteractReset extends JavaPlugin implements Listener, CommandExec
                 1.0f,
                 pitch);
             if (debugMode) {
-                getLogger().info("Son de reset joué: " + soundToPlay.name() + " pour " + material.name() + " à " + block.getLocation() + " (nouvel état ouvert: " + isNowOpen + ")");
+                getLogger().info("Son de reset joué: " + Registry.SOUND_EVENT.getKey(soundToPlay) + " pour " + material.name() + " à " + block.getLocation() + " (nouvel état ouvert: " + isNowOpen + ")");
             }
         }
     }
